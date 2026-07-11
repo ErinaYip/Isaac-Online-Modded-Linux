@@ -96,6 +96,9 @@ isaac-online-modded --patch-game
 # 实验性 Lua API patch：当前候选可能导致游戏打不开，默认不要使用
 isaac-online-modded --patch-game --experimental-lua-api
 
+# 只回滚实验性 Lua API patch，保留前两项联机 patch
+isaac-online-modded --revert-experimental-lua-api
+
 # 只 patch External Item Descriptions；未安装时会报错
 isaac-online-modded --patch-eid
 
@@ -129,8 +132,13 @@ eid_api.lua.bak
 ## 排查：游戏打不开
 
 如果之前运行过带 Lua API 候选 patch 的版本，游戏可能会打不开。先用新版工具
-重新 patch 一遍默认两项，或手动把候选 patch 回滚；当前新版默认不会再写入该
-候选 patch。
+只回滚该候选 patch，保留前两项联机 patch：
+
+```bash
+isaac-online-modded --revert-experimental-lua-api
+```
+
+当前新版默认不会再写入该候选 patch。
 
 ## 排查：能进联机但 mod 不生效
 

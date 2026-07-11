@@ -101,6 +101,22 @@ class CLITest(unittest.TestCase):
             self.assertNotIn(cli.EXPERIMENTAL_LUA_API_PATCH.pattern, data)
             self.assertIn(cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, data)
 
+    def test_revert_experimental_lua_api_patch_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            game_dir = make_game_without_eid(Path(tmp), include_experimental_lua_api=True)
+            exe = game_dir / cli.GAME_EXE_NAME
+
+            self.assertEqual(cli.main(["--game-exe", str(exe), "--no-eid", "--experimental-lua-api"]), 0)
+            patched = exe.read_bytes()
+            self.assertIn(cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, patched)
+
+            self.assertEqual(cli.main(["--game-exe", str(exe), "--revert-experimental-lua-api"]), 0)
+            repaired = exe.read_bytes()
+            self.assertIn(cli.EXPERIMENTAL_LUA_API_PATCH.pattern, repaired)
+            self.assertNotIn(cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, repaired)
+            for patch in cli.BINARY_PATCHES:
+                self.assertIn(patch.already_patched_pattern, repaired)
+
     def test_no_eid_patches_game_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             game_dir = make_game_tree(Path(tmp))

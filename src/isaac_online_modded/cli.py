@@ -375,6 +375,35 @@ def patch_game_executable(game_exe: Path, suffix: str, dry_run: bool, include_ex
     return True
 
 
+def revert_binary_patch(game_exe: Path, patch: BinaryPatch, suffix: str, dry_run: bool) -> bool:
+    if not game_exe.exists():
+        raise PatchError(f"Game executable not found: {game_exe}")
+    if not game_exe.is_file():
+        raise PatchError(f"Game executable is not a file: {game_exe}")
+
+    original = game_exe.read_bytes()
+    patched_count = original.count(patch.already_patched_pattern)
+    original_count = original.count(patch.pattern)
+
+    if patched_count == 0:
+        if original_count:
+            print(f"Not applied: {patch.name}; original bytes already present.")
+            return False
+        raise PatchError(f"Neither patched nor original pattern for {patch.name!r} was found.")
+    if patched_count != 1:
+        raise PatchError(f"Expected exactly one patched pattern for {patch.name!r}, found {patched_count}.")
+
+    index = original.find(patch.already_patched_pattern)
+    print(f"Will revert {patch.name} at offset 0x{index:x}")
+    backup_once(game_exe, suffix, dry_run)
+    if dry_run:
+        print(f"Would write reverted executable: {game_exe}")
+    else:
+        game_exe.write_bytes(original.replace(patch.already_patched_pattern, patch.pattern, 1))
+        print(f"Reverted {patch.name}: {game_exe}")
+    return True
+
+
 def read_lines(path: Path) -> list[str]:
     return path.read_text(encoding="utf-8", errors="replace").splitlines()
 
@@ -559,6 +588,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
             "This is disabled by default because the current candidate patch can prevent the game from starting."
         ),
     )
+    parser.add_argument(
+        "--revert-experimental-lua-api",
+        action="store_true",
+        help="Revert only the experimental Lua API patch without restoring the whole executable backup.",
+    )
     parser.add_argument("--restore", action="store_true", help="Restore the game executable from its backup and exit.")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be changed without writing files.")
     parser.add_argument("--print-path", action="store_true", help="Print the detected game executable path and exit.")
@@ -568,8 +602,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     explicit_path_options = sum(bool(v) for v in (args.path, args.game_exe, args.game_dir))
     if explicit_path_options > 1:
         parser.error("Use only one of positional path, --game-exe, or --game-dir.")
-    if args.restore and (args.patch_game or args.patch_eid or args.all):
+    if args.restore and (args.patch_game or args.patch_eid or args.all or args.revert_experimental_lua_api):
         parser.error("--restore cannot be combined with patch actions.")
+    if args.revert_experimental_lua_api and (args.patch_game or args.patch_eid or args.all):
+        parser.error("--revert-experimental-lua-api cannot be combined with patch actions.")
     if args.no_eid and (args.patch_eid or args.all):
         parser.error("--no-eid cannot be combined with --patch-eid or --all.")
     if args.experimental_lua_api and args.patch_eid and not (args.patch_game or args.all):
@@ -588,6 +624,9 @@ def main(argv: list[str]) -> int:
 
     if args.restore:
         restore_backup(game_exe, args.backup_suffix, args.dry_run)
+        return 0
+    if args.revert_experimental_lua_api:
+        revert_binary_patch(game_exe, EXPERIMENTAL_LUA_API_PATCH, args.backup_suffix, args.dry_run)
         return 0
 
     explicit_action = args.patch_game or args.patch_eid or args.all
