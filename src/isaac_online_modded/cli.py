@@ -106,12 +106,23 @@ BINARY_PATCHES = (
                 0x00,
             ]
         ),
-        replacements=((3, 0x90), (4, 0x90), (8, 0x90), (9, 0x90), (13, 0x90), (14, 0x90)),
+        replacements=(
+            (3, 0x90),
+            (4, 0x90),
+            (8, 0x90),
+            (9, 0x90),
+            (13, 0x90),
+            (14, 0x90),
+        ),
     ),
     BinaryPatch(
         name="desync analytics sender",
-        pattern=bytes([0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x10, 0x53, 0x56, 0x57, 0xFF, 0x15]),
-        already_patched_pattern=bytes([0xC3, 0x8B, 0xEC, 0x83, 0xEC, 0x10, 0x53, 0x56, 0x57, 0xFF, 0x15]),
+        pattern=bytes(
+            [0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x10, 0x53, 0x56, 0x57, 0xFF, 0x15]
+        ),
+        already_patched_pattern=bytes(
+            [0xC3, 0x8B, 0xEC, 0x83, 0xEC, 0x10, 0x53, 0x56, 0x57, 0xFF, 0x15]
+        ),
         replacements=((0, 0xC3),),
     ),
 )
@@ -293,7 +304,12 @@ def detect_game_exe(args: argparse.Namespace) -> Path:
         if exe.exists():
             return exe
 
-    return Path.home() / ".local/share/Steam/steamapps/common" / GAME_DIR_NAME / GAME_EXE_NAME
+    return (
+        Path.home()
+        / ".local/share/Steam/steamapps/common"
+        / GAME_DIR_NAME
+        / GAME_EXE_NAME
+    )
 
 
 def backup_once(path: Path, suffix: str, dry_run: bool) -> Path:
@@ -327,13 +343,20 @@ def restore_backup(game_exe: Path, suffix: str, dry_run: bool) -> None:
     print(f"Restored: {game_exe}")
 
 
-def selected_binary_patches(include_experimental_lua_api: bool) -> tuple[BinaryPatch, ...]:
+def selected_binary_patches(
+    include_experimental_lua_api: bool,
+) -> tuple[BinaryPatch, ...]:
     if include_experimental_lua_api:
         return BINARY_PATCHES + (EXPERIMENTAL_LUA_API_PATCH,)
     return BINARY_PATCHES
 
 
-def patch_game_executable(game_exe: Path, suffix: str, dry_run: bool, include_experimental_lua_api: bool = False) -> bool:
+def patch_game_executable(
+    game_exe: Path,
+    suffix: str,
+    dry_run: bool,
+    include_experimental_lua_api: bool = False,
+) -> bool:
     if not game_exe.exists():
         searched = "\n  ".join(str(p / GAME_EXE_NAME) for p in candidate_game_dirs())
         raise PatchError(
@@ -362,7 +385,9 @@ def patch_game_executable(game_exe: Path, suffix: str, dry_run: bool, include_ex
             print(f"Already patched: {patch.name} at offset 0x{already_index:x}")
             continue
 
-        raise PatchError(f"Pattern for {patch.name!r} not found. The game may have updated and this patcher may be outdated.")
+        raise PatchError(
+            f"Pattern for {patch.name!r} not found. The game may have updated and this patcher may be outdated."
+        )
 
     if not changed:
         print("Game executable already patched.")
@@ -377,7 +402,9 @@ def patch_game_executable(game_exe: Path, suffix: str, dry_run: bool, include_ex
     return True
 
 
-def revert_binary_patch(game_exe: Path, patch: BinaryPatch, suffix: str, dry_run: bool) -> bool:
+def revert_binary_patch(
+    game_exe: Path, patch: BinaryPatch, suffix: str, dry_run: bool
+) -> bool:
     if not game_exe.exists():
         raise PatchError(f"Game executable not found: {game_exe}")
     if not game_exe.is_file():
@@ -391,9 +418,13 @@ def revert_binary_patch(game_exe: Path, patch: BinaryPatch, suffix: str, dry_run
         if original_count:
             print(f"Not applied: {patch.name}; original bytes already present.")
             return False
-        raise PatchError(f"Neither patched nor original pattern for {patch.name!r} was found.")
+        raise PatchError(
+            f"Neither patched nor original pattern for {patch.name!r} was found."
+        )
     if patched_count != 1:
-        raise PatchError(f"Expected exactly one patched pattern for {patch.name!r}, found {patched_count}.")
+        raise PatchError(
+            f"Expected exactly one patched pattern for {patch.name!r}, found {patched_count}."
+        )
 
     index = original.find(patch.already_patched_pattern)
     print(f"Will revert {patch.name} at offset 0x{index:x}")
@@ -401,7 +432,9 @@ def revert_binary_patch(game_exe: Path, patch: BinaryPatch, suffix: str, dry_run
     if dry_run:
         print(f"Would write reverted executable: {game_exe}")
     else:
-        game_exe.write_bytes(original.replace(patch.already_patched_pattern, patch.pattern, 1))
+        game_exe.write_bytes(
+            original.replace(patch.already_patched_pattern, patch.pattern, 1)
+        )
         print(f"Reverted {patch.name}: {game_exe}")
     return True
 
@@ -415,7 +448,11 @@ def bundled_lua_runtime() -> str:
 
 
 def lua_runtime_is_usable(text: str) -> bool:
-    return "function RegisterMod" in text and "Game = Game_0" in text and "function _RunCallback" in text
+    return (
+        "function RegisterMod" in text
+        and "Game = Game_0" in text
+        and "function _RunCallback" in text
+    )
 
 
 def patch_lua_runtime(game_exe: Path, suffix: str, dry_run: bool) -> bool:
@@ -495,7 +532,9 @@ def has_new_eid_patch(lines: list[str]) -> bool:
             continue
         if index + len(checks) >= len(lines):
             continue
-        if all(check in lines[index + 1 + offset] for offset, check in enumerate(checks)):
+        if all(
+            check in lines[index + 1 + offset] for offset, check in enumerate(checks)
+        ):
             return True
     return False
 
@@ -512,7 +551,9 @@ def patch_eid_main_lua(main_lua: Path) -> tuple[list[str], bool]:
     new_lines: list[str] = []
     for line in lines:
         if marker in line:
-            new_lines.append(line.replace("EID.isMultiplayer = false", "EID.isMultiplayer = true"))
+            new_lines.append(
+                line.replace("EID.isMultiplayer = false", "EID.isMultiplayer = true")
+            )
             changed = True
         else:
             new_lines.append(line)
@@ -534,7 +575,8 @@ def patch_eid_api_lua(eid_api: Path) -> tuple[list[str], bool]:
         anchor = next(
             index
             for index, line in enumerate(lines)
-            if "return listUpdatedForPlayers -- dont evaluate when bad data is present" in line
+            if "return listUpdatedForPlayers -- dont evaluate when bad data is present"
+            in line
         )
     except StopIteration as exc:
         raise PatchError(f"Could not find EID patch anchor in {eid_api}") from exc
@@ -563,7 +605,9 @@ def find_eid_dir(mods_dir: Path) -> Path:
     return sorted(matches)[0]
 
 
-def patch_external_item_descriptions(game_exe: Path, mods_dir_arg: str | None, suffix: str, dry_run: bool) -> bool:
+def patch_external_item_descriptions(
+    game_exe: Path, mods_dir_arg: str | None, suffix: str, dry_run: bool
+) -> bool:
     mods_dir = expand_path(mods_dir_arg) if mods_dir_arg else game_exe.parent / "mods"
     eid_dir = find_eid_dir(mods_dir)
     print(f"Using EID mod directory: {eid_dir}")
@@ -605,7 +649,9 @@ def patch_external_item_descriptions(game_exe: Path, mods_dir_arg: str | None, s
     return changed_any
 
 
-def try_patch_external_item_descriptions(game_exe: Path, mods_dir_arg: str | None, suffix: str, dry_run: bool) -> bool:
+def try_patch_external_item_descriptions(
+    game_exe: Path, mods_dir_arg: str | None, suffix: str, dry_run: bool
+) -> bool:
     try:
         return patch_external_item_descriptions(game_exe, mods_dir_arg, suffix, dry_run)
     except EIDNotFoundError as exc:
@@ -625,17 +671,36 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--game-exe", help=f"Path to {GAME_EXE_NAME}.")
     parser.add_argument("--game-dir", help=f"Path to '{GAME_DIR_NAME}'.")
-    parser.add_argument("--mods-dir", help="Path to the Isaac mods directory for EID auto-patching/--patch-eid/--all.")
-    parser.add_argument("--patch-game", action="store_true", help="Patch the game executable.")
+    parser.add_argument(
+        "--mods-dir",
+        help="Path to the Isaac mods directory for EID auto-patching/--patch-eid/--all.",
+    )
+    parser.add_argument(
+        "--patch-game", action="store_true", help="Patch the game executable."
+    )
     parser.add_argument(
         "--patch-lua-runtime",
         action="store_true",
         help="Install resources/scripts/main.lua so RegisterMod/Game/_RunCallback exist for Lua mods.",
     )
-    parser.add_argument("--patch-eid", action="store_true", help="Patch External Item Descriptions for co-op.")
-    parser.add_argument("--all", action="store_true", help="Patch both the game executable and EID.")
-    parser.add_argument("--no-eid", action="store_true", help="Do not auto-patch External Item Descriptions in the default mode.")
-    parser.add_argument("--no-lua-runtime", action="store_true", help="Do not auto-install resources/scripts/main.lua in default/--all mode.")
+    parser.add_argument(
+        "--patch-eid",
+        action="store_true",
+        help="Patch External Item Descriptions for co-op.",
+    )
+    parser.add_argument(
+        "--all", action="store_true", help="Patch both the game executable and EID."
+    )
+    parser.add_argument(
+        "--no-eid",
+        action="store_true",
+        help="Do not auto-patch External Item Descriptions in the default mode.",
+    )
+    parser.add_argument(
+        "--no-lua-runtime",
+        action="store_true",
+        help="Do not auto-install resources/scripts/main.lua in default/--all mode.",
+    )
     parser.add_argument(
         "--experimental-lua-api",
         action="store_true",
@@ -649,27 +714,61 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Revert only the experimental Lua API patch without restoring the whole executable backup.",
     )
-    parser.add_argument("--restore", action="store_true", help="Restore the game executable from its backup and exit.")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would be changed without writing files.")
-    parser.add_argument("--print-path", action="store_true", help="Print the detected game executable path and exit.")
-    parser.add_argument("--backup-suffix", default=DEFAULT_BACKUP_SUFFIX, help="Suffix used for backup files.")
+    parser.add_argument(
+        "--restore",
+        action="store_true",
+        help="Restore the game executable from its backup and exit.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be changed without writing files.",
+    )
+    parser.add_argument(
+        "--print-path",
+        action="store_true",
+        help="Print the detected game executable path and exit.",
+    )
+    parser.add_argument(
+        "--backup-suffix",
+        default=DEFAULT_BACKUP_SUFFIX,
+        help="Suffix used for backup files.",
+    )
     args = parser.parse_args(argv)
 
-    explicit_path_options = sum(bool(v) for v in (args.path, args.game_exe, args.game_dir))
+    explicit_path_options = sum(
+        bool(v) for v in (args.path, args.game_exe, args.game_dir)
+    )
     if explicit_path_options > 1:
         parser.error("Use only one of positional path, --game-exe, or --game-dir.")
     if args.restore and (
-        args.patch_game or args.patch_lua_runtime or args.patch_eid or args.all or args.revert_experimental_lua_api
+        args.patch_game
+        or args.patch_lua_runtime
+        or args.patch_eid
+        or args.all
+        or args.revert_experimental_lua_api
     ):
         parser.error("--restore cannot be combined with patch actions.")
-    if args.revert_experimental_lua_api and (args.patch_game or args.patch_lua_runtime or args.patch_eid or args.all):
-        parser.error("--revert-experimental-lua-api cannot be combined with patch actions.")
+    if args.revert_experimental_lua_api and (
+        args.patch_game or args.patch_lua_runtime or args.patch_eid or args.all
+    ):
+        parser.error(
+            "--revert-experimental-lua-api cannot be combined with patch actions."
+        )
     if args.no_eid and (args.patch_eid or args.all):
         parser.error("--no-eid cannot be combined with --patch-eid or --all.")
     if args.no_lua_runtime and (args.patch_lua_runtime or args.all):
-        parser.error("--no-lua-runtime cannot be combined with --patch-lua-runtime or --all.")
-    if args.experimental_lua_api and args.patch_eid and not (args.patch_game or args.all):
-        parser.error("--experimental-lua-api only applies when patching the game executable.")
+        parser.error(
+            "--no-lua-runtime cannot be combined with --patch-lua-runtime or --all."
+        )
+    if (
+        args.experimental_lua_api
+        and args.patch_eid
+        and not (args.patch_game or args.all)
+    ):
+        parser.error(
+            "--experimental-lua-api only applies when patching the game executable."
+        )
 
     return args
 
@@ -686,10 +785,14 @@ def main(argv: list[str]) -> int:
         restore_backup(game_exe, args.backup_suffix, args.dry_run)
         return 0
     if args.revert_experimental_lua_api:
-        revert_binary_patch(game_exe, EXPERIMENTAL_LUA_API_PATCH, args.backup_suffix, args.dry_run)
+        revert_binary_patch(
+            game_exe, EXPERIMENTAL_LUA_API_PATCH, args.backup_suffix, args.dry_run
+        )
         return 0
 
-    explicit_action = args.patch_game or args.patch_lua_runtime or args.patch_eid or args.all
+    explicit_action = (
+        args.patch_game or args.patch_lua_runtime or args.patch_eid or args.all
+    )
     patch_game = args.patch_game or args.all
     patch_runtime = args.patch_lua_runtime or args.all
     patch_eid = args.patch_eid or args.all
@@ -701,14 +804,20 @@ def main(argv: list[str]) -> int:
         eid_optional = patch_eid
 
     if patch_game:
-        patch_game_executable(game_exe, args.backup_suffix, args.dry_run, args.experimental_lua_api)
+        patch_game_executable(
+            game_exe, args.backup_suffix, args.dry_run, args.experimental_lua_api
+        )
     if patch_runtime:
         patch_lua_runtime(game_exe, args.backup_suffix, args.dry_run)
     if patch_eid:
         if eid_optional:
-            try_patch_external_item_descriptions(game_exe, args.mods_dir, args.backup_suffix, args.dry_run)
+            try_patch_external_item_descriptions(
+                game_exe, args.mods_dir, args.backup_suffix, args.dry_run
+            )
         else:
-            patch_external_item_descriptions(game_exe, args.mods_dir, args.backup_suffix, args.dry_run)
+            patch_external_item_descriptions(
+                game_exe, args.mods_dir, args.backup_suffix, args.dry_run
+            )
 
     return 0
 

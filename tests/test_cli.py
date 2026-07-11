@@ -38,7 +38,9 @@ def make_game_tree(root: Path, include_experimental_lua_api: bool = False) -> Pa
     return game_dir
 
 
-def make_game_without_eid(root: Path, include_experimental_lua_api: bool = False) -> Path:
+def make_game_without_eid(
+    root: Path, include_experimental_lua_api: bool = False
+) -> Path:
     game_dir = root / "The Binding of Isaac Rebirth"
     game_dir.mkdir(parents=True)
     (game_dir / "resources" / "scripts").mkdir(parents=True)
@@ -61,21 +63,34 @@ class CLITest(unittest.TestCase):
             self.assertNotEqual(first_patch, original)
             for patch in cli.BINARY_PATCHES:
                 self.assertIn(patch.already_patched_pattern, first_patch)
-            self.assertEqual((game_dir / f"{cli.GAME_EXE_NAME}.bak").read_bytes(), original)
-            runtime_text = (game_dir / "resources" / "scripts" / "main.lua").read_text(encoding="utf-8")
+            self.assertEqual(
+                (game_dir / f"{cli.GAME_EXE_NAME}.bak").read_bytes(), original
+            )
+            runtime_text = (game_dir / "resources" / "scripts" / "main.lua").read_text(
+                encoding="utf-8"
+            )
             self.assertIn("function RegisterMod", runtime_text)
             self.assertIn("Game = Game_0", runtime_text)
             self.assertNotIn("Custom mod logic integrated into the game", runtime_text)
 
             main_lua = game_dir / "mods" / "External Item Descriptions" / "main.lua"
-            eid_api = game_dir / "mods" / "External Item Descriptions" / "features" / "eid_api.lua"
+            eid_api = (
+                game_dir
+                / "mods"
+                / "External Item Descriptions"
+                / "features"
+                / "eid_api.lua"
+            )
             main_text = main_lua.read_text(encoding="utf-8")
             self.assertIn(
                 "EID.isMultiplayer = true -- Used to color P1's highlight/outline indicators",
                 main_text,
             )
             self.assertIn("\nEID.isMultiplayer = false\n", main_text)
-            self.assertIn("if (stage >= 13 or stage < 1) then", eid_api.read_text(encoding="utf-8"))
+            self.assertIn(
+                "if (stage >= 13 or stage < 1) then",
+                eid_api.read_text(encoding="utf-8"),
+            )
 
             self.assertEqual(cli.main(["--game-exe", str(exe)]), 0)
             self.assertEqual(exe.read_bytes(), first_patch)
@@ -98,7 +113,9 @@ class CLITest(unittest.TestCase):
             game_dir = make_game_without_eid(Path(tmp))
             exe = game_dir / cli.GAME_EXE_NAME
 
-            self.assertEqual(cli.main(["--game-exe", str(exe), "--no-eid", "--no-lua-runtime"]), 0)
+            self.assertEqual(
+                cli.main(["--game-exe", str(exe), "--no-eid", "--no-lua-runtime"]), 0
+            )
             self.assertFalse((game_dir / "resources" / "scripts" / "main.lua").exists())
 
     def test_patch_lua_runtime_replaces_incomplete_file(self) -> None:
@@ -108,40 +125,67 @@ class CLITest(unittest.TestCase):
             runtime.write_text("-- incomplete\n", encoding="utf-8")
             exe = game_dir / cli.GAME_EXE_NAME
 
-            self.assertEqual(cli.main(["--game-exe", str(exe), "--patch-lua-runtime"]), 0)
-            self.assertEqual(runtime.with_name("main.lua.bak").read_text(encoding="utf-8"), "-- incomplete\n")
+            self.assertEqual(
+                cli.main(["--game-exe", str(exe), "--patch-lua-runtime"]), 0
+            )
+            self.assertEqual(
+                runtime.with_name("main.lua.bak").read_text(encoding="utf-8"),
+                "-- incomplete\n",
+            )
             runtime_text = runtime.read_text(encoding="utf-8")
             self.assertIn("function RegisterMod", runtime_text)
             self.assertIn("Game = Game_0", runtime_text)
 
     def test_experimental_lua_api_patch_is_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            game_dir = make_game_without_eid(Path(tmp), include_experimental_lua_api=True)
+            game_dir = make_game_without_eid(
+                Path(tmp), include_experimental_lua_api=True
+            )
             exe = game_dir / cli.GAME_EXE_NAME
 
             self.assertEqual(cli.main(["--game-exe", str(exe), "--no-eid"]), 0)
             data = exe.read_bytes()
             self.assertIn(cli.EXPERIMENTAL_LUA_API_PATCH.pattern, data)
-            self.assertNotIn(cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, data)
+            self.assertNotIn(
+                cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, data
+            )
 
-            self.assertEqual(cli.main(["--game-exe", str(exe), "--no-eid", "--experimental-lua-api"]), 0)
+            self.assertEqual(
+                cli.main(
+                    ["--game-exe", str(exe), "--no-eid", "--experimental-lua-api"]
+                ),
+                0,
+            )
             data = exe.read_bytes()
             self.assertNotIn(cli.EXPERIMENTAL_LUA_API_PATCH.pattern, data)
             self.assertIn(cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, data)
 
     def test_revert_experimental_lua_api_patch_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            game_dir = make_game_without_eid(Path(tmp), include_experimental_lua_api=True)
+            game_dir = make_game_without_eid(
+                Path(tmp), include_experimental_lua_api=True
+            )
             exe = game_dir / cli.GAME_EXE_NAME
 
-            self.assertEqual(cli.main(["--game-exe", str(exe), "--no-eid", "--experimental-lua-api"]), 0)
+            self.assertEqual(
+                cli.main(
+                    ["--game-exe", str(exe), "--no-eid", "--experimental-lua-api"]
+                ),
+                0,
+            )
             patched = exe.read_bytes()
-            self.assertIn(cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, patched)
+            self.assertIn(
+                cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, patched
+            )
 
-            self.assertEqual(cli.main(["--game-exe", str(exe), "--revert-experimental-lua-api"]), 0)
+            self.assertEqual(
+                cli.main(["--game-exe", str(exe), "--revert-experimental-lua-api"]), 0
+            )
             repaired = exe.read_bytes()
             self.assertIn(cli.EXPERIMENTAL_LUA_API_PATCH.pattern, repaired)
-            self.assertNotIn(cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, repaired)
+            self.assertNotIn(
+                cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, repaired
+            )
             for patch in cli.BINARY_PATCHES:
                 self.assertIn(patch.already_patched_pattern, repaired)
 
@@ -174,7 +218,9 @@ class CLITest(unittest.TestCase):
             exe = game_dir / cli.GAME_EXE_NAME
             original = exe.read_bytes()
 
-            self.assertEqual(cli.main(["--game-exe", str(exe), "--all", "--dry-run"]), 0)
+            self.assertEqual(
+                cli.main(["--game-exe", str(exe), "--all", "--dry-run"]), 0
+            )
             self.assertEqual(exe.read_bytes(), original)
             self.assertFalse((game_dir / f"{cli.GAME_EXE_NAME}.bak").exists())
 
