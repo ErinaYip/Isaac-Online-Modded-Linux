@@ -112,54 +112,55 @@ BINARY_PATCHES = (
         already_patched_pattern=bytes([0xC3, 0x8B, 0xEC, 0x83, 0xEC, 0x10, 0x53, 0x56, 0x57, 0xFF, 0x15]),
         replacements=((0, 0xC3),),
     ),
-    BinaryPatch(
-        name="Lua mod API in Repentance+",
-        pattern=bytes(
-            [
-                0x8A,
-                0x45,
-                0x08,  # mov al, byte ptr [ebp+8]
-                0x8B,
-                0xCE,
-                0x88,
-                0x46,
-                0x1C,  # mov byte ptr [esi+0x1c], al
-                0xE8,
-                0x0C,
-                0x63,
-                0x00,
-                0x00,  # call Lua API registration
-                0x68,
-                0x54,
-                0xED,
-                0xB6,
-                0x00,
-            ]
-        ),
-        already_patched_pattern=bytes(
-            [
-                0xB0,
-                0x01,
-                0x90,  # mov al, 1; nop
-                0x8B,
-                0xCE,
-                0x88,
-                0x46,
-                0x1C,
-                0xE8,
-                0x0C,
-                0x63,
-                0x00,
-                0x00,
-                0x68,
-                0x54,
-                0xED,
-                0xB6,
-                0x00,
-            ]
-        ),
-        replacements=((0, 0xB0), (1, 0x01), (2, 0x90)),
+)
+
+EXPERIMENTAL_LUA_API_PATCH = BinaryPatch(
+    name="Lua mod API in Repentance+",
+    pattern=bytes(
+        [
+            0x8A,
+            0x45,
+            0x08,  # mov al, byte ptr [ebp+8]
+            0x8B,
+            0xCE,
+            0x88,
+            0x46,
+            0x1C,  # mov byte ptr [esi+0x1c], al
+            0xE8,
+            0x0C,
+            0x63,
+            0x00,
+            0x00,  # call Lua API registration
+            0x68,
+            0x54,
+            0xED,
+            0xB6,
+            0x00,
+        ]
     ),
+    already_patched_pattern=bytes(
+        [
+            0xB0,
+            0x01,
+            0x90,  # mov al, 1; nop
+            0x8B,
+            0xCE,
+            0x88,
+            0x46,
+            0x1C,
+            0xE8,
+            0x0C,
+            0x63,
+            0x00,
+            0x00,
+            0x68,
+            0x54,
+            0xED,
+            0xB6,
+            0x00,
+        ]
+    ),
+    replacements=((0, 0xB0), (1, 0x01), (2, 0x90)),
 )
 
 
@@ -324,7 +325,13 @@ def restore_backup(game_exe: Path, suffix: str, dry_run: bool) -> None:
     print(f"Restored: {game_exe}")
 
 
-def patch_game_executable(game_exe: Path, suffix: str, dry_run: bool) -> bool:
+def selected_binary_patches(include_experimental_lua_api: bool) -> tuple[BinaryPatch, ...]:
+    if include_experimental_lua_api:
+        return BINARY_PATCHES + (EXPERIMENTAL_LUA_API_PATCH,)
+    return BINARY_PATCHES
+
+
+def patch_game_executable(game_exe: Path, suffix: str, dry_run: bool, include_experimental_lua_api: bool = False) -> bool:
     if not game_exe.exists():
         searched = "\n  ".join(str(p / GAME_EXE_NAME) for p in candidate_game_dirs())
         raise PatchError(
@@ -339,7 +346,7 @@ def patch_game_executable(game_exe: Path, suffix: str, dry_run: bool) -> bool:
     patched = bytearray(original)
     changed = False
 
-    for patch in BINARY_PATCHES:
+    for patch in selected_binary_patches(include_experimental_lua_api):
         index = original.find(patch.pattern)
         if index != -1:
             changed = True
@@ -544,6 +551,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--patch-eid", action="store_true", help="Patch External Item Descriptions for co-op.")
     parser.add_argument("--all", action="store_true", help="Patch both the game executable and EID.")
     parser.add_argument("--no-eid", action="store_true", help="Do not auto-patch External Item Descriptions in the default mode.")
+    parser.add_argument(
+        "--experimental-lua-api",
+        action="store_true",
+        help=(
+            "Also apply the experimental Repentance+ Lua API patch. "
+            "This is disabled by default because the current candidate patch can prevent the game from starting."
+        ),
+    )
     parser.add_argument("--restore", action="store_true", help="Restore the game executable from its backup and exit.")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be changed without writing files.")
     parser.add_argument("--print-path", action="store_true", help="Print the detected game executable path and exit.")
@@ -557,6 +572,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         parser.error("--restore cannot be combined with patch actions.")
     if args.no_eid and (args.patch_eid or args.all):
         parser.error("--no-eid cannot be combined with --patch-eid or --all.")
+    if args.experimental_lua_api and args.patch_eid and not (args.patch_game or args.all):
+        parser.error("--experimental-lua-api only applies when patching the game executable.")
 
     return args
 
@@ -583,7 +600,7 @@ def main(argv: list[str]) -> int:
         eid_optional = patch_eid
 
     if patch_game:
-        patch_game_executable(game_exe, args.backup_suffix, args.dry_run)
+        patch_game_executable(game_exe, args.backup_suffix, args.dry_run, args.experimental_lua_api)
     if patch_eid:
         if eid_optional:
             try_patch_external_item_descriptions(game_exe, args.mods_dir, args.backup_suffix, args.dry_run)

@@ -7,13 +7,18 @@ from pathlib import Path
 from isaac_online_modded import cli
 
 
-def make_game_tree(root: Path) -> Path:
+def executable_bytes(include_experimental_lua_api: bool = False) -> bytes:
+    patches = cli.selected_binary_patches(include_experimental_lua_api)
+    return b"prefix" + b"middle".join(patch.pattern for patch in patches) + b"suffix"
+
+
+def make_game_tree(root: Path, include_experimental_lua_api: bool = False) -> Path:
     game_dir = root / "The Binding of Isaac Rebirth"
     eid_dir = game_dir / "mods" / "External Item Descriptions"
     (eid_dir / "features").mkdir(parents=True)
 
     exe = game_dir / cli.GAME_EXE_NAME
-    exe.write_bytes(b"prefix" + b"middle".join(patch.pattern for patch in cli.BINARY_PATCHES) + b"suffix")
+    exe.write_bytes(executable_bytes(include_experimental_lua_api))
 
     (eid_dir / "main.lua").write_text(
         "EID = {}\n"
@@ -32,12 +37,12 @@ def make_game_tree(root: Path) -> Path:
     return game_dir
 
 
-def make_game_without_eid(root: Path) -> Path:
+def make_game_without_eid(root: Path, include_experimental_lua_api: bool = False) -> Path:
     game_dir = root / "The Binding of Isaac Rebirth"
     game_dir.mkdir(parents=True)
 
     exe = game_dir / cli.GAME_EXE_NAME
-    exe.write_bytes(b"prefix" + b"middle".join(patch.pattern for patch in cli.BINARY_PATCHES) + b"suffix")
+    exe.write_bytes(executable_bytes(include_experimental_lua_api))
 
     return game_dir
 
@@ -80,6 +85,21 @@ class CLITest(unittest.TestCase):
             self.assertEqual(cli.main(["--game-exe", str(exe)]), 0)
             for patch in cli.BINARY_PATCHES:
                 self.assertIn(patch.already_patched_pattern, exe.read_bytes())
+
+    def test_experimental_lua_api_patch_is_opt_in(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            game_dir = make_game_without_eid(Path(tmp), include_experimental_lua_api=True)
+            exe = game_dir / cli.GAME_EXE_NAME
+
+            self.assertEqual(cli.main(["--game-exe", str(exe), "--no-eid"]), 0)
+            data = exe.read_bytes()
+            self.assertIn(cli.EXPERIMENTAL_LUA_API_PATCH.pattern, data)
+            self.assertNotIn(cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, data)
+
+            self.assertEqual(cli.main(["--game-exe", str(exe), "--no-eid", "--experimental-lua-api"]), 0)
+            data = exe.read_bytes()
+            self.assertNotIn(cli.EXPERIMENTAL_LUA_API_PATCH.pattern, data)
+            self.assertIn(cli.EXPERIMENTAL_LUA_API_PATCH.already_patched_pattern, data)
 
     def test_no_eid_patches_game_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -15,12 +15,14 @@
 - 不包含 GitHub Actions Windows 打包流程
 - 只保留 Linux 可运行 CLI、Nix flake、Python 包和测试
 
-当前会 patch 三处 `isaac-ng.exe` 逻辑：
+当前默认只 patch 两处 `isaac-ng.exe` 逻辑：
 
 1. 允许开启 mod 时进入在线联机。
 2. 关闭 desync analytics sender。
-3. 在 Repentance+ 中强制启用 Lua Mod API，避免 Lua mod 报
-   `RegisterMod` 为 nil。
+
+曾经加入过一个 Repentance+ Lua Mod API 候选 patch，用来尝试修复
+`RegisterMod` 为 nil；实际测试会导致游戏启动停在早期 Lua 初始化阶段，
+因此现在默认禁用，只保留为显式实验参数 `--experimental-lua-api`。
 
 ## 默认路径
 
@@ -91,6 +93,9 @@ isaac-online-modded --game-dir "$HOME/.local/share/Steam/steamapps/common/The Bi
 # 只 patch 游戏联机 mod 检测和 desync analytics
 isaac-online-modded --patch-game
 
+# 实验性 Lua API patch：当前候选可能导致游戏打不开，默认不要使用
+isaac-online-modded --patch-game --experimental-lua-api
+
 # 只 patch External Item Descriptions；未安装时会报错
 isaac-online-modded --patch-eid
 
@@ -121,6 +126,12 @@ eid_api.lua.bak
 
 备份已存在时不会覆盖。
 
+## 排查：游戏打不开
+
+如果之前运行过带 Lua API 候选 patch 的版本，游戏可能会打不开。先用新版工具
+重新 patch 一遍默认两项，或手动把候选 patch 回滚；当前新版默认不会再写入该
+候选 patch。
+
 ## 排查：能进联机但 mod 不生效
 
 如果能在开启 mod 的情况下进入联机，但 EID 等 Lua mod 没有效果，先重新运行：
@@ -141,9 +152,10 @@ $HOME/.local/share/Steam/steamapps/compatdata/250900/pfx/drive_c/users/steamuser
 attempt to call a nil value (global 'RegisterMod')
 ```
 
-说明游戏扫描到了 mod，但在线模式下 Lua Mod API 没有被启用，通常就是
-`isaac-ng.exe` 已被 Steam 更新还原，或者缺少本工具的第三个
-`Lua mod API in Repentance+` patch，需要再次执行 patch。
+说明游戏扫描到了 mod，但在线模式下 Lua Mod API 没有被启用。当前默认 patch
+只解决“带 mod 进入联机”，还没有稳定解决 Repentance+ 在线模式下
+`RegisterMod` 没注册的问题；旧的 Lua API 候选 patch 已确认会导致启动失败，
+所以不再默认使用。
 
 ## 测试
 
