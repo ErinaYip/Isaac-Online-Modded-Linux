@@ -19,7 +19,8 @@ def make_game_tree(root: Path) -> Path:
 
     (eid_dir / "main.lua").write_text(
         "EID = {}\n"
-        "EID.isMultiplayer = false -- Used to color P1's highlight/outline indicators (single player just uses white)\n",
+        "EID.isMultiplayer = false -- Used to color P1's highlight/outline indicators (single player just uses white)\n"
+        "EID.isMultiplayer = false\n",
         encoding="utf-8",
     )
     (eid_dir / "features" / "eid_api.lua").write_text(
@@ -61,7 +62,12 @@ class CLITest(unittest.TestCase):
 
             main_lua = game_dir / "mods" / "External Item Descriptions" / "main.lua"
             eid_api = game_dir / "mods" / "External Item Descriptions" / "features" / "eid_api.lua"
-            self.assertIn("EID.isMultiplayer = true", main_lua.read_text(encoding="utf-8"))
+            main_text = main_lua.read_text(encoding="utf-8")
+            self.assertIn(
+                "EID.isMultiplayer = true -- Used to color P1's highlight/outline indicators",
+                main_text,
+            )
+            self.assertIn("\nEID.isMultiplayer = false\n", main_text)
             self.assertIn("if (stage >= 13 or stage < 1) then", eid_api.read_text(encoding="utf-8"))
 
             self.assertEqual(cli.main(["--game-exe", str(exe)]), 0)
@@ -87,7 +93,10 @@ class CLITest(unittest.TestCase):
             self.assertIn(cli.BINARY_PATCHES[0].already_patched_pattern, exe.read_bytes())
 
             main_lua = game_dir / "mods" / "External Item Descriptions" / "main.lua"
-            self.assertIn("EID.isMultiplayer = false", main_lua.read_text(encoding="utf-8"))
+            self.assertIn(
+                "EID.isMultiplayer = false -- Used to color P1's highlight/outline indicators",
+                main_lua.read_text(encoding="utf-8"),
+            )
 
     def test_explicit_all_requires_eid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

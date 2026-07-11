@@ -114,6 +114,29 @@ eid_api.lua.bak
 
 备份已存在时不会覆盖。
 
+## 排查：能进联机但 mod 不生效
+
+如果能在开启 mod 的情况下进入联机，但 EID 等 Lua mod 没有效果，先重新运行：
+
+```bash
+nix run .# -- --all
+```
+
+Steam 更新游戏后会覆盖 `isaac-ng.exe`，需要重新 patch。典型日志位置：
+
+```text
+$HOME/.local/share/Steam/steamapps/compatdata/250900/pfx/drive_c/users/steamuser/Documents/My Games/Binding of Isaac Repentance+/log.txt
+```
+
+如果日志里出现：
+
+```text
+attempt to call a nil value (global 'RegisterMod')
+```
+
+说明游戏扫描到了 mod，但在线模式下 Lua Mod API 没有被启用，通常就是
+`isaac-ng.exe` 已被 Steam 更新还原，需要再次执行 patch。
+
 ## 测试
 
 ```bash

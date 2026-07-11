@@ -368,14 +368,16 @@ def has_new_eid_patch(lines: list[str]) -> bool:
 
 def patch_eid_main_lua(main_lua: Path) -> tuple[list[str], bool]:
     lines = read_lines(main_lua)
-    if any("EID.isMultiplayer = true" in line for line in lines):
+    marker = "EID.isMultiplayer = false -- Used to color P1's highlight/outline indicators (single player just uses white)"
+    patched_marker = "EID.isMultiplayer = true -- Used to color P1's highlight/outline indicators (single player just uses white)"
+
+    if any(patched_marker in line for line in lines):
         return lines, False
 
-    marker = "EID.isMultiplayer = false -- Used to color P1's highlight/outline indicators (single player just uses white)"
     changed = False
     new_lines: list[str] = []
     for line in lines:
-        if marker in line or "EID.isMultiplayer = false" in line:
+        if marker in line:
             new_lines.append(line.replace("EID.isMultiplayer = false", "EID.isMultiplayer = true"))
             changed = True
         else:
