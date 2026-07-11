@@ -1,5 +1,7 @@
 # Isaac Online Modded Linux
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 A standalone Linux/Nix CLI project for patching **The Binding of Isaac: Rebirth**
 / Repentance+ `isaac-ng.exe` so mods can be used in online co-op.
 
