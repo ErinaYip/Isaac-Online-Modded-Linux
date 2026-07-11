@@ -12,10 +12,8 @@ def make_game_tree(root: Path) -> Path:
     eid_dir = game_dir / "mods" / "External Item Descriptions"
     (eid_dir / "features").mkdir(parents=True)
 
-    patch1 = cli.BINARY_PATCHES[0].pattern
-    patch2 = cli.BINARY_PATCHES[1].pattern
     exe = game_dir / cli.GAME_EXE_NAME
-    exe.write_bytes(b"prefix" + patch1 + b"middle" + patch2 + b"suffix")
+    exe.write_bytes(b"prefix" + b"middle".join(patch.pattern for patch in cli.BINARY_PATCHES) + b"suffix")
 
     (eid_dir / "main.lua").write_text(
         "EID = {}\n"
@@ -38,10 +36,8 @@ def make_game_without_eid(root: Path) -> Path:
     game_dir = root / "The Binding of Isaac Rebirth"
     game_dir.mkdir(parents=True)
 
-    patch1 = cli.BINARY_PATCHES[0].pattern
-    patch2 = cli.BINARY_PATCHES[1].pattern
     exe = game_dir / cli.GAME_EXE_NAME
-    exe.write_bytes(b"prefix" + patch1 + b"middle" + patch2 + b"suffix")
+    exe.write_bytes(b"prefix" + b"middle".join(patch.pattern for patch in cli.BINARY_PATCHES) + b"suffix")
 
     return game_dir
 
@@ -56,8 +52,8 @@ class CLITest(unittest.TestCase):
             self.assertEqual(cli.main(["--game-exe", str(exe)]), 0)
             first_patch = exe.read_bytes()
             self.assertNotEqual(first_patch, original)
-            self.assertIn(cli.BINARY_PATCHES[0].already_patched_pattern, first_patch)
-            self.assertIn(cli.BINARY_PATCHES[1].already_patched_pattern, first_patch)
+            for patch in cli.BINARY_PATCHES:
+                self.assertIn(patch.already_patched_pattern, first_patch)
             self.assertEqual((game_dir / f"{cli.GAME_EXE_NAME}.bak").read_bytes(), original)
 
             main_lua = game_dir / "mods" / "External Item Descriptions" / "main.lua"
@@ -82,7 +78,8 @@ class CLITest(unittest.TestCase):
             exe = game_dir / cli.GAME_EXE_NAME
 
             self.assertEqual(cli.main(["--game-exe", str(exe)]), 0)
-            self.assertIn(cli.BINARY_PATCHES[0].already_patched_pattern, exe.read_bytes())
+            for patch in cli.BINARY_PATCHES:
+                self.assertIn(patch.already_patched_pattern, exe.read_bytes())
 
     def test_no_eid_patches_game_only(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -90,7 +87,8 @@ class CLITest(unittest.TestCase):
             exe = game_dir / cli.GAME_EXE_NAME
 
             self.assertEqual(cli.main(["--game-exe", str(exe), "--no-eid"]), 0)
-            self.assertIn(cli.BINARY_PATCHES[0].already_patched_pattern, exe.read_bytes())
+            for patch in cli.BINARY_PATCHES:
+                self.assertIn(patch.already_patched_pattern, exe.read_bytes())
 
             main_lua = game_dir / "mods" / "External Item Descriptions" / "main.lua"
             self.assertIn(

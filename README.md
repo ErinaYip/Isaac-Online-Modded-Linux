@@ -15,6 +15,13 @@
 - 不包含 GitHub Actions Windows 打包流程
 - 只保留 Linux 可运行 CLI、Nix flake、Python 包和测试
 
+当前会 patch 三处 `isaac-ng.exe` 逻辑：
+
+1. 允许开启 mod 时进入在线联机。
+2. 关闭 desync analytics sender。
+3. 在 Repentance+ 中强制启用 Lua Mod API，避免 Lua mod 报
+   `RegisterMod` 为 nil。
+
 ## 默认路径
 
 默认检测 Steam 常见安装位置：
@@ -135,7 +142,8 @@ attempt to call a nil value (global 'RegisterMod')
 ```
 
 说明游戏扫描到了 mod，但在线模式下 Lua Mod API 没有被启用，通常就是
-`isaac-ng.exe` 已被 Steam 更新还原，需要再次执行 patch。
+`isaac-ng.exe` 已被 Steam 更新还原，或者缺少本工具的第三个
+`Lua mod API in Repentance+` patch，需要再次执行 patch。
 
 ## 测试
 

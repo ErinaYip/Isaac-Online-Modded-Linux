@@ -112,6 +112,54 @@ BINARY_PATCHES = (
         already_patched_pattern=bytes([0xC3, 0x8B, 0xEC, 0x83, 0xEC, 0x10, 0x53, 0x56, 0x57, 0xFF, 0x15]),
         replacements=((0, 0xC3),),
     ),
+    BinaryPatch(
+        name="Lua mod API in Repentance+",
+        pattern=bytes(
+            [
+                0x8A,
+                0x45,
+                0x08,  # mov al, byte ptr [ebp+8]
+                0x8B,
+                0xCE,
+                0x88,
+                0x46,
+                0x1C,  # mov byte ptr [esi+0x1c], al
+                0xE8,
+                0x0C,
+                0x63,
+                0x00,
+                0x00,  # call Lua API registration
+                0x68,
+                0x54,
+                0xED,
+                0xB6,
+                0x00,
+            ]
+        ),
+        already_patched_pattern=bytes(
+            [
+                0xB0,
+                0x01,
+                0x90,  # mov al, 1; nop
+                0x8B,
+                0xCE,
+                0x88,
+                0x46,
+                0x1C,
+                0xE8,
+                0x0C,
+                0x63,
+                0x00,
+                0x00,
+                0x68,
+                0x54,
+                0xED,
+                0xB6,
+                0x00,
+            ]
+        ),
+        replacements=((0, 0xB0), (1, 0x01), (2, 0x90)),
+    ),
 )
 
 
