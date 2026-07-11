@@ -3,9 +3,13 @@
 独立的 Linux/Nix CLI 项目，用于 patch **The Binding of Isaac: Rebirth**
 的 `isaac-ng.exe`，从而在在线联机模式中启用 mod。
 
-同时支持 **External Item Descriptions**：默认运行时会自动检测该 mod，
-如果已安装就 patch `main.lua` 和 `features/eid_api.lua`，让它可以在联机
-模式中使用；如果没有安装则自动跳过。
+同时支持两类 Lua 侧修复：
+
+- 默认安装 `resources/scripts/main.lua` 运行时，让 `RegisterMod`、`Game()`、
+  `_RunCallback` 等 Lua mod API 入口存在。
+- 默认自动检测 **External Item Descriptions**，如果已安装就 patch
+  `main.lua` 和 `features/eid_api.lua`，让它可以在联机模式中使用；如果没有
+  安装则自动跳过。
 
 这个项目已经从原 Windows/WPF 工具中拆出：
 
@@ -19,6 +23,10 @@
 
 1. 允许开启 mod 时进入在线联机。
 2. 关闭 desync analytics sender。
+
+另外会安装缺失的 `resources/scripts/main.lua`。如果日志里有
+`resources/scripts/main.lua: No such file or directory`，或者各个 mod 报
+`RegisterMod` 为 nil，就需要这个运行时文件。
 
 曾经加入过一个 Repentance+ Lua Mod API 候选 patch，用来尝试修复
 `RegisterMod` 为 nil；实际测试会导致游戏启动停在早期 Lua 初始化阶段，
@@ -93,6 +101,12 @@ isaac-online-modded --game-dir "$HOME/.local/share/Steam/steamapps/common/The Bi
 # 只 patch 游戏联机 mod 检测和 desync analytics
 isaac-online-modded --patch-game
 
+# 只安装 Lua mod API 运行时 resources/scripts/main.lua
+isaac-online-modded --patch-lua-runtime
+
+# 默认动作中跳过 Lua runtime 安装
+isaac-online-modded --no-lua-runtime
+
 # 实验性 Lua API patch：当前候选可能导致游戏打不开，默认不要使用
 isaac-online-modded --patch-game --experimental-lua-api
 
@@ -160,10 +174,20 @@ $HOME/.local/share/Steam/steamapps/compatdata/250900/pfx/drive_c/users/steamuser
 attempt to call a nil value (global 'RegisterMod')
 ```
 
-说明游戏扫描到了 mod，但在线模式下 Lua Mod API 没有被启用。当前默认 patch
-只解决“带 mod 进入联机”，还没有稳定解决 Repentance+ 在线模式下
-`RegisterMod` 没注册的问题；旧的 Lua API 候选 patch 已确认会导致启动失败，
-所以不再默认使用。
+说明游戏扫描到了 mod，但启动阶段没有加载 `resources/scripts/main.lua`
+运行时。重新运行新版默认命令：
+
+```bash
+isaac-online-modded
+```
+
+或只安装运行时：
+
+```bash
+isaac-online-modded --patch-lua-runtime
+```
+
+旧的二进制 Lua API 候选 patch 已确认会导致启动失败，所以不再默认使用。
 
 ## 测试
 

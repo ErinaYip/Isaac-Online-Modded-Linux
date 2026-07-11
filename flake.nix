@@ -27,7 +27,7 @@
         {
           default = pkgs.python3Packages.buildPythonApplication {
             pname = "isaac-online-modded-linux";
-            version = "1.3.1";
+            version = "1.4.0";
             src = ./.;
 
             pyproject = true;

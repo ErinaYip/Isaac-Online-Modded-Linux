@@ -9,6 +9,7 @@ library so it can be packaged and run as a normal Linux/Nix command.
 from __future__ import annotations
 
 import argparse
+import importlib.resources
 import os
 import re
 import shutil
@@ -21,6 +22,7 @@ from typing import Iterable
 GAME_DIR_NAME = "The Binding of Isaac Rebirth"
 GAME_EXE_NAME = "isaac-ng.exe"
 DEFAULT_BACKUP_SUFFIX = ".bak"
+LUA_RUNTIME_RESOURCE = "repentance_plus_main.lua"
 
 
 class PatchError(RuntimeError):
@@ -404,6 +406,54 @@ def revert_binary_patch(game_exe: Path, patch: BinaryPatch, suffix: str, dry_run
     return True
 
 
+def bundled_lua_runtime() -> str:
+    return (
+        importlib.resources.files("isaac_online_modded")
+        .joinpath("resources", LUA_RUNTIME_RESOURCE)
+        .read_text(encoding="utf-8")
+    )
+
+
+def lua_runtime_is_usable(text: str) -> bool:
+    return "function RegisterMod" in text and "Game = Game_0" in text and "function _RunCallback" in text
+
+
+def patch_lua_runtime(game_exe: Path, suffix: str, dry_run: bool) -> bool:
+    scripts_dir = game_exe.parent / "resources" / "scripts"
+    if not scripts_dir.exists():
+        raise PatchError(f"Lua scripts directory not found: {scripts_dir}")
+    if not scripts_dir.is_dir():
+        raise PatchError(f"Lua scripts path is not a directory: {scripts_dir}")
+
+    target = scripts_dir / "main.lua"
+    runtime = bundled_lua_runtime()
+    if not lua_runtime_is_usable(runtime):
+        raise PatchError(f"Bundled Lua runtime is incomplete: {LUA_RUNTIME_RESOURCE}")
+
+    if target.exists():
+        current = target.read_text(encoding="utf-8", errors="replace")
+        if current == runtime:
+            print(f"Lua runtime already installed: {target}")
+            return False
+        if lua_runtime_is_usable(current):
+            print(f"Existing Lua runtime looks usable; leaving unchanged: {target}")
+            return False
+        backup_once(target, suffix, dry_run)
+        if dry_run:
+            print(f"Would replace incomplete Lua runtime: {target}")
+        else:
+            target.write_text(runtime, encoding="utf-8")
+            print(f"Replaced incomplete Lua runtime: {target}")
+        return True
+
+    if dry_run:
+        print(f"Would install Lua runtime: {target}")
+    else:
+        target.write_text(runtime, encoding="utf-8")
+        print(f"Installed Lua runtime: {target}")
+    return True
+
+
 def read_lines(path: Path) -> list[str]:
     return path.read_text(encoding="utf-8", errors="replace").splitlines()
 
@@ -577,9 +627,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--game-dir", help=f"Path to '{GAME_DIR_NAME}'.")
     parser.add_argument("--mods-dir", help="Path to the Isaac mods directory for EID auto-patching/--patch-eid/--all.")
     parser.add_argument("--patch-game", action="store_true", help="Patch the game executable.")
+    parser.add_argument(
+        "--patch-lua-runtime",
+        action="store_true",
+        help="Install resources/scripts/main.lua so RegisterMod/Game/_RunCallback exist for Lua mods.",
+    )
     parser.add_argument("--patch-eid", action="store_true", help="Patch External Item Descriptions for co-op.")
     parser.add_argument("--all", action="store_true", help="Patch both the game executable and EID.")
     parser.add_argument("--no-eid", action="store_true", help="Do not auto-patch External Item Descriptions in the default mode.")
+    parser.add_argument("--no-lua-runtime", action="store_true", help="Do not auto-install resources/scripts/main.lua in default/--all mode.")
     parser.add_argument(
         "--experimental-lua-api",
         action="store_true",
@@ -602,12 +658,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     explicit_path_options = sum(bool(v) for v in (args.path, args.game_exe, args.game_dir))
     if explicit_path_options > 1:
         parser.error("Use only one of positional path, --game-exe, or --game-dir.")
-    if args.restore and (args.patch_game or args.patch_eid or args.all or args.revert_experimental_lua_api):
+    if args.restore and (
+        args.patch_game or args.patch_lua_runtime or args.patch_eid or args.all or args.revert_experimental_lua_api
+    ):
         parser.error("--restore cannot be combined with patch actions.")
-    if args.revert_experimental_lua_api and (args.patch_game or args.patch_eid or args.all):
+    if args.revert_experimental_lua_api and (args.patch_game or args.patch_lua_runtime or args.patch_eid or args.all):
         parser.error("--revert-experimental-lua-api cannot be combined with patch actions.")
     if args.no_eid and (args.patch_eid or args.all):
         parser.error("--no-eid cannot be combined with --patch-eid or --all.")
+    if args.no_lua_runtime and (args.patch_lua_runtime or args.all):
+        parser.error("--no-lua-runtime cannot be combined with --patch-lua-runtime or --all.")
     if args.experimental_lua_api and args.patch_eid and not (args.patch_game or args.all):
         parser.error("--experimental-lua-api only applies when patching the game executable.")
 
@@ -629,17 +689,21 @@ def main(argv: list[str]) -> int:
         revert_binary_patch(game_exe, EXPERIMENTAL_LUA_API_PATCH, args.backup_suffix, args.dry_run)
         return 0
 
-    explicit_action = args.patch_game or args.patch_eid or args.all
+    explicit_action = args.patch_game or args.patch_lua_runtime or args.patch_eid or args.all
     patch_game = args.patch_game or args.all
+    patch_runtime = args.patch_lua_runtime or args.all
     patch_eid = args.patch_eid or args.all
     eid_optional = False
     if not explicit_action:
         patch_game = True
+        patch_runtime = not args.no_lua_runtime
         patch_eid = not args.no_eid
         eid_optional = patch_eid
 
     if patch_game:
         patch_game_executable(game_exe, args.backup_suffix, args.dry_run, args.experimental_lua_api)
+    if patch_runtime:
+        patch_lua_runtime(game_exe, args.backup_suffix, args.dry_run)
     if patch_eid:
         if eid_optional:
             try_patch_external_item_descriptions(game_exe, args.mods_dir, args.backup_suffix, args.dry_run)

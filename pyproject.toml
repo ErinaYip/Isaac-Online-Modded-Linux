@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "isaac-online-modded-linux"
-version = "1.3.1"
+version = "1.4.0"
 description = "Standalone Linux CLI patcher for enabling mods in The Binding of Isaac online co-op"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,3 +24,6 @@ isaac-online-modded = "isaac_online_modded.cli:main_entry"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+isaac_online_modded = ["resources/*.lua"]

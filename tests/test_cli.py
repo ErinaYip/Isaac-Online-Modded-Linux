@@ -16,6 +16,7 @@ def make_game_tree(root: Path, include_experimental_lua_api: bool = False) -> Pa
     game_dir = root / "The Binding of Isaac Rebirth"
     eid_dir = game_dir / "mods" / "External Item Descriptions"
     (eid_dir / "features").mkdir(parents=True)
+    (game_dir / "resources" / "scripts").mkdir(parents=True)
 
     exe = game_dir / cli.GAME_EXE_NAME
     exe.write_bytes(executable_bytes(include_experimental_lua_api))
@@ -40,6 +41,7 @@ def make_game_tree(root: Path, include_experimental_lua_api: bool = False) -> Pa
 def make_game_without_eid(root: Path, include_experimental_lua_api: bool = False) -> Path:
     game_dir = root / "The Binding of Isaac Rebirth"
     game_dir.mkdir(parents=True)
+    (game_dir / "resources" / "scripts").mkdir(parents=True)
 
     exe = game_dir / cli.GAME_EXE_NAME
     exe.write_bytes(executable_bytes(include_experimental_lua_api))
@@ -60,6 +62,10 @@ class CLITest(unittest.TestCase):
             for patch in cli.BINARY_PATCHES:
                 self.assertIn(patch.already_patched_pattern, first_patch)
             self.assertEqual((game_dir / f"{cli.GAME_EXE_NAME}.bak").read_bytes(), original)
+            runtime_text = (game_dir / "resources" / "scripts" / "main.lua").read_text(encoding="utf-8")
+            self.assertIn("function RegisterMod", runtime_text)
+            self.assertIn("Game = Game_0", runtime_text)
+            self.assertNotIn("Custom mod logic integrated into the game", runtime_text)
 
             main_lua = game_dir / "mods" / "External Item Descriptions" / "main.lua"
             eid_api = game_dir / "mods" / "External Item Descriptions" / "features" / "eid_api.lua"
@@ -85,6 +91,28 @@ class CLITest(unittest.TestCase):
             self.assertEqual(cli.main(["--game-exe", str(exe)]), 0)
             for patch in cli.BINARY_PATCHES:
                 self.assertIn(patch.already_patched_pattern, exe.read_bytes())
+            self.assertTrue((game_dir / "resources" / "scripts" / "main.lua").exists())
+
+    def test_no_lua_runtime_skips_runtime_install(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            game_dir = make_game_without_eid(Path(tmp))
+            exe = game_dir / cli.GAME_EXE_NAME
+
+            self.assertEqual(cli.main(["--game-exe", str(exe), "--no-eid", "--no-lua-runtime"]), 0)
+            self.assertFalse((game_dir / "resources" / "scripts" / "main.lua").exists())
+
+    def test_patch_lua_runtime_replaces_incomplete_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            game_dir = make_game_without_eid(Path(tmp))
+            runtime = game_dir / "resources" / "scripts" / "main.lua"
+            runtime.write_text("-- incomplete\n", encoding="utf-8")
+            exe = game_dir / cli.GAME_EXE_NAME
+
+            self.assertEqual(cli.main(["--game-exe", str(exe), "--patch-lua-runtime"]), 0)
+            self.assertEqual(runtime.with_name("main.lua.bak").read_text(encoding="utf-8"), "-- incomplete\n")
+            runtime_text = runtime.read_text(encoding="utf-8")
+            self.assertIn("function RegisterMod", runtime_text)
+            self.assertIn("Game = Game_0", runtime_text)
 
     def test_experimental_lua_api_patch_is_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
