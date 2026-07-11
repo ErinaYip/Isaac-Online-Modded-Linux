@@ -27,6 +27,10 @@ class PatchError(RuntimeError):
     pass
 
 
+class EIDNotFoundError(PatchError):
+    pass
+
+
 @dataclass(frozen=True)
 class BinaryPatch:
     name: str
@@ -406,7 +410,7 @@ def patch_eid_api_lua(eid_api: Path) -> tuple[list[str], bool]:
 
 def find_eid_dir(mods_dir: Path) -> Path:
     if not mods_dir.exists():
-        raise PatchError(f"Mods directory not found: {mods_dir}")
+        raise EIDNotFoundError(f"Mods directory not found: {mods_dir}")
     if not mods_dir.is_dir():
         raise PatchError(f"Mods path is not a directory: {mods_dir}")
 
@@ -419,7 +423,7 @@ def find_eid_dir(mods_dir: Path) -> Path:
         and "descriptions" in path.name.lower()
     ]
     if not matches:
-        raise PatchError(f"External Item Descriptions not found in: {mods_dir}")
+        raise EIDNotFoundError(f"External Item Descriptions not found in: {mods_dir}")
     return sorted(matches)[0]
 
 
@@ -465,6 +469,14 @@ def patch_external_item_descriptions(game_exe: Path, mods_dir_arg: str | None, s
     return changed_any
 
 
+def try_patch_external_item_descriptions(game_exe: Path, mods_dir_arg: str | None, suffix: str, dry_run: bool) -> bool:
+    try:
+        return patch_external_item_descriptions(game_exe, mods_dir_arg, suffix, dry_run)
+    except EIDNotFoundError as exc:
+        print(f"External Item Descriptions not installed; skipping. {exc}")
+        return False
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Patch The Binding of Isaac: Rebirth to allow mods in online co-op on Linux.",
@@ -477,10 +489,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--game-exe", help=f"Path to {GAME_EXE_NAME}.")
     parser.add_argument("--game-dir", help=f"Path to '{GAME_DIR_NAME}'.")
-    parser.add_argument("--mods-dir", help="Path to the Isaac mods directory for --patch-eid/--all.")
+    parser.add_argument("--mods-dir", help="Path to the Isaac mods directory for EID auto-patching/--patch-eid/--all.")
     parser.add_argument("--patch-game", action="store_true", help="Patch the game executable.")
     parser.add_argument("--patch-eid", action="store_true", help="Patch External Item Descriptions for co-op.")
     parser.add_argument("--all", action="store_true", help="Patch both the game executable and EID.")
+    parser.add_argument("--no-eid", action="store_true", help="Do not auto-patch External Item Descriptions in the default mode.")
     parser.add_argument("--restore", action="store_true", help="Restore the game executable from its backup and exit.")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be changed without writing files.")
     parser.add_argument("--print-path", action="store_true", help="Print the detected game executable path and exit.")
@@ -492,6 +505,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         parser.error("Use only one of positional path, --game-exe, or --game-dir.")
     if args.restore and (args.patch_game or args.patch_eid or args.all):
         parser.error("--restore cannot be combined with patch actions.")
+    if args.no_eid and (args.patch_eid or args.all):
+        parser.error("--no-eid cannot be combined with --patch-eid or --all.")
 
     return args
 
@@ -508,15 +523,22 @@ def main(argv: list[str]) -> int:
         restore_backup(game_exe, args.backup_suffix, args.dry_run)
         return 0
 
+    explicit_action = args.patch_game or args.patch_eid or args.all
     patch_game = args.patch_game or args.all
     patch_eid = args.patch_eid or args.all
-    if not patch_game and not patch_eid:
+    eid_optional = False
+    if not explicit_action:
         patch_game = True
+        patch_eid = not args.no_eid
+        eid_optional = patch_eid
 
     if patch_game:
         patch_game_executable(game_exe, args.backup_suffix, args.dry_run)
     if patch_eid:
-        patch_external_item_descriptions(game_exe, args.mods_dir, args.backup_suffix, args.dry_run)
+        if eid_optional:
+            try_patch_external_item_descriptions(game_exe, args.mods_dir, args.backup_suffix, args.dry_run)
+        else:
+            patch_external_item_descriptions(game_exe, args.mods_dir, args.backup_suffix, args.dry_run)
 
     return 0
 

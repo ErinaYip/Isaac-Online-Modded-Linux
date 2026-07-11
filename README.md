@@ -3,6 +3,10 @@
 独立的 Linux/Nix CLI 项目，用于 patch **The Binding of Isaac: Rebirth**
 的 `isaac-ng.exe`，从而在在线联机模式中启用 mod。
 
+同时支持 **External Item Descriptions**：默认运行时会自动检测该 mod，
+如果已安装就 patch `main.lua` 和 `features/eid_api.lua`，让它可以在联机
+模式中使用；如果没有安装则自动跳过。
+
 这个项目已经从原 Windows/WPF 工具中拆出：
 
 - 不包含 `.sln` / `.csproj`
@@ -30,11 +34,14 @@ nix run .#
 # 明确指定 Steam 默认游戏目录
 nix run .# -- --game-dir "$HOME/.local/share/Steam/steamapps/common/The Binding of Isaac Rebirth"
 
-# 同时 patch 游戏本体和 External Item Descriptions
+# 默认 patch 游戏本体；如果安装了 External Item Descriptions，也会自动启用
+nix run .#
+
+# 强制同时 patch 游戏本体和 External Item Descriptions
 nix run .# -- --all
 
 # 仅预览，不写入文件
-nix run .# -- --dry-run --all
+nix run .# -- --dry-run
 ```
 
 ## 安装到当前用户 profile
@@ -59,8 +66,11 @@ PYTHONPATH=src python -m isaac_online_modded --help
 ## 常用命令
 
 ```bash
-# 默认动作：patch game
+# 默认动作：patch game，并在已安装时自动允许 External Item Descriptions
 isaac-online-modded
+
+# 只 patch 游戏，不处理 External Item Descriptions
+isaac-online-modded --no-eid
 
 # 显示检测到的 isaac-ng.exe 路径
 isaac-online-modded --print-path
@@ -71,13 +81,13 @@ isaac-online-modded --game-exe "$HOME/.local/share/Steam/steamapps/common/The Bi
 # 指定游戏目录
 isaac-online-modded --game-dir "$HOME/.local/share/Steam/steamapps/common/The Binding of Isaac Rebirth"
 
-# patch 游戏联机 mod 检测和 desync analytics
+# 只 patch 游戏联机 mod 检测和 desync analytics
 isaac-online-modded --patch-game
 
-# patch External Item Descriptions
+# 只 patch External Item Descriptions；未安装时会报错
 isaac-online-modded --patch-eid
 
-# 两者都 patch
+# 强制两者都 patch；External Item Descriptions 未安装时会报错
 isaac-online-modded --all
 
 # 从 .bak 恢复 isaac-ng.exe

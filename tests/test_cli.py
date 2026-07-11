@@ -33,14 +33,26 @@ def make_game_tree(root: Path) -> Path:
     return game_dir
 
 
+def make_game_without_eid(root: Path) -> Path:
+    game_dir = root / "The Binding of Isaac Rebirth"
+    game_dir.mkdir(parents=True)
+
+    patch1 = cli.BINARY_PATCHES[0].pattern
+    patch2 = cli.BINARY_PATCHES[1].pattern
+    exe = game_dir / cli.GAME_EXE_NAME
+    exe.write_bytes(b"prefix" + patch1 + b"middle" + patch2 + b"suffix")
+
+    return game_dir
+
+
 class CLITest(unittest.TestCase):
-    def test_patch_game_eid_idempotent_and_restore(self) -> None:
+    def test_default_patches_game_and_eid_when_installed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             game_dir = make_game_tree(Path(tmp))
             exe = game_dir / cli.GAME_EXE_NAME
             original = exe.read_bytes()
 
-            self.assertEqual(cli.main(["--game-exe", str(exe), "--all"]), 0)
+            self.assertEqual(cli.main(["--game-exe", str(exe)]), 0)
             first_patch = exe.read_bytes()
             self.assertNotEqual(first_patch, original)
             self.assertIn(cli.BINARY_PATCHES[0].already_patched_pattern, first_patch)
@@ -52,11 +64,38 @@ class CLITest(unittest.TestCase):
             self.assertIn("EID.isMultiplayer = true", main_lua.read_text(encoding="utf-8"))
             self.assertIn("if (stage >= 13 or stage < 1) then", eid_api.read_text(encoding="utf-8"))
 
-            self.assertEqual(cli.main(["--game-exe", str(exe), "--all"]), 0)
+            self.assertEqual(cli.main(["--game-exe", str(exe)]), 0)
             self.assertEqual(exe.read_bytes(), first_patch)
 
             self.assertEqual(cli.main(["--game-exe", str(exe), "--restore"]), 0)
             self.assertEqual(exe.read_bytes(), original)
+
+    def test_default_skips_eid_when_not_installed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            game_dir = make_game_without_eid(Path(tmp))
+            exe = game_dir / cli.GAME_EXE_NAME
+
+            self.assertEqual(cli.main(["--game-exe", str(exe)]), 0)
+            self.assertIn(cli.BINARY_PATCHES[0].already_patched_pattern, exe.read_bytes())
+
+    def test_no_eid_patches_game_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            game_dir = make_game_tree(Path(tmp))
+            exe = game_dir / cli.GAME_EXE_NAME
+
+            self.assertEqual(cli.main(["--game-exe", str(exe), "--no-eid"]), 0)
+            self.assertIn(cli.BINARY_PATCHES[0].already_patched_pattern, exe.read_bytes())
+
+            main_lua = game_dir / "mods" / "External Item Descriptions" / "main.lua"
+            self.assertIn("EID.isMultiplayer = false", main_lua.read_text(encoding="utf-8"))
+
+    def test_explicit_all_requires_eid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            game_dir = make_game_without_eid(Path(tmp))
+            exe = game_dir / cli.GAME_EXE_NAME
+
+            with self.assertRaises(cli.EIDNotFoundError):
+                cli.main(["--game-exe", str(exe), "--all"])
 
     def test_dry_run_does_not_write(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
