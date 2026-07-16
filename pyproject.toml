@@ -1,16 +1,18 @@
 [build-system]
-requires = ["setuptools>=69"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.11.25,<0.12.0"]
+build-backend = "uv_build"
 
 [project]
 name = "isaac-online-modded-linux"
-version = "1.4.0"
+version = "1.0.1"
 description = "Standalone Linux CLI patcher for enabling mods in The Binding of Isaac online co-op"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
-  { name = "Isaac Online Modded Linux maintainers" },
+  { name = "erina" },
 ]
+license = "MIT"
+license-files = ["LICENSE"]
 classifiers = [
   "Environment :: Console",
   "Intended Audience :: End Users/Desktop",
@@ -19,11 +21,12 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
 ]
 
+[project.urls]
+Author = "https://codeberg.org/erina"
+Homepage = "https://codeberg.org/erina"
+
 [project.scripts]
 isaac-online-modded = "isaac_online_modded.cli:main_entry"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-isaac_online_modded = ["resources/*.lua"]
+[tool.uv.build-backend]
+module-name = "isaac_online_modded"

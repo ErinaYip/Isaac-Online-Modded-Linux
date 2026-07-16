@@ -3,7 +3,7 @@ Linux-native CLI for Isaac Online Modded.
 
 This is the standalone Linux project: no WPF, no .csproj, no Windows publish
 profiles.  It mirrors the original patching logic with only Python's standard
-library so it can be packaged and run as a normal Linux/Nix command.
+library so it can be packaged and run as a normal Linux/uv command.
 """
 
 from __future__ import annotations
